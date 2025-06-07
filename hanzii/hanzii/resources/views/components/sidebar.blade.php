@@ -18,7 +18,7 @@
                 </div>
             </a>
 
-            <a href="{{ route('hoc-vien.ket-qua.index') }}"
+            <a href="{{ route('hoc-vien.ket-qua') }}"
                 class="block py-2.5 px-4 rounded transition duration-200 {{ $active === 'ket-qua' ? 'bg-gray-900 text-white' : 'text-gray-400 hover:bg-gray-700 hover:text-white' }}">
                 <div class="flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24"

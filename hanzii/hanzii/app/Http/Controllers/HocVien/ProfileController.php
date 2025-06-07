@@ -19,46 +19,14 @@ class ProfileController extends Controller
     public function index()
     {
         $nguoiDungId = session('nguoi_dung_id');
-        if (!$nguoiDungId) {
-            return redirect()->route('login')->with('error', 'Vui lòng đăng nhập lại để tiếp tục');
-        }
         
         $nguoiDung = NguoiDung::find($nguoiDungId);
-        if (!$nguoiDung) {
-            return redirect()->route('login')->with('error', 'Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại');
-        }
         
         $hocVien = HocVien::where('nguoi_dung_id', $nguoiDungId)->first();
         
-        if (!$hocVien) {
-            return redirect()->route('hoc-vien.lop-hoc.index')->with('error', 'Không tìm thấy thông tin học viên');
-        }
-        
-        // Lấy thống kê của học viên
-        $tongSoKhoaHoc = DangKyHoc::where('hoc_vien_id', $hocVien->id)
-                            ->where('trang_thai', 'da_xac_nhan')
-                            ->count();
-        
-        $dangHoc = DangKyHoc::where('hoc_vien_id', $hocVien->id)
-                    ->where('trang_thai', 'da_xac_nhan')
-                    ->whereHas('lopHoc', function ($q) {
-                        $q->where('trang_thai', 'dang_dien_ra');
-                    })
-                    ->count();
-        
-        $daHoanThanh = DangKyHoc::where('hoc_vien_id', $hocVien->id)
-                        ->where('trang_thai', 'da_xac_nhan')
-                        ->whereHas('lopHoc', function ($q) {
-                            $q->where('trang_thai', 'da_hoan_thanh');
-                        })
-                        ->count();
-        
         return view('hoc-vien.profile.index', compact(
             'nguoiDung', 
-            'hocVien',
-            'tongSoKhoaHoc',
-            'dangHoc',
-            'daHoanThanh'
+            'hocVien'
         ));
     }
     
@@ -68,21 +36,11 @@ class ProfileController extends Controller
     public function edit()
     {
         $nguoiDungId = session('nguoi_dung_id');
-        if (!$nguoiDungId) {
-            return redirect()->route('login')->with('error', 'Vui lòng đăng nhập lại để tiếp tục');
-        }
-        
+       
         $nguoiDung = NguoiDung::find($nguoiDungId);
-        if (!$nguoiDung) {
-            return redirect()->route('login')->with('error', 'Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại');
-        }
-        
+       
         $hocVien = HocVien::where('nguoi_dung_id', $nguoiDungId)->first();
-        
-        if (!$hocVien) {
-            return redirect()->route('hoc-vien.lop-hoc.index')->with('error', 'Không tìm thấy thông tin học viên');
-        }
-        
+
         return view('hoc-vien.profile.edit', compact('nguoiDung', 'hocVien'));
     }
     
@@ -92,21 +50,10 @@ class ProfileController extends Controller
     public function update(Request $request)
     {
         $nguoiDungId = session('nguoi_dung_id');
-        if (!$nguoiDungId) {
-            return redirect()->route('login')->with('error', 'Vui lòng đăng nhập lại để tiếp tục');
-        }
         
         $nguoiDung = NguoiDung::find($nguoiDungId);
-        if (!$nguoiDung) {
-            return redirect()->route('login')->with('error', 'Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại');
-        }
         
         $hocVien = HocVien::where('nguoi_dung_id', $nguoiDungId)->first();
-        
-        if (!$hocVien) {
-            return redirect()->route('hoc-vien.lop-hoc.index')->with('error', 'Không tìm thấy thông tin học viên');
-        }
-        
         // Validate thông tin
         $request->validate([
             'ho' => 'required|string|max:255',
@@ -136,11 +83,11 @@ class ProfileController extends Controller
         
         // Xử lý avatar nếu có
         if ($request->hasFile('anh_dai_dien')) {
+
             // Xóa ảnh cũ nếu có
             if ($nguoiDung->anh_dai_dien && $nguoiDung->anh_dai_dien !== 'avatars/default.png') {
                 Storage::disk('public')->delete($nguoiDung->anh_dai_dien);
             }
-            
             // Lưu ảnh mới
             $avatarPath = $request->file('anh_dai_dien')->store('avatars', 'public');
             $nguoiDung->anh_dai_dien = $avatarPath;
@@ -164,10 +111,6 @@ class ProfileController extends Controller
     public function showChangePasswordForm()
     {
         $nguoiDungId = session('nguoi_dung_id');
-        if (!$nguoiDungId) {
-            return redirect()->route('login')->with('error', 'Vui lòng đăng nhập lại để tiếp tục');
-        }
-        
         return view('hoc-vien.profile.change-password');
     }
     
@@ -182,20 +125,13 @@ class ProfileController extends Controller
         ]);
         
         $nguoiDungId = session('nguoi_dung_id');
-        if (!$nguoiDungId) {
-            return redirect()->route('login')->with('error', 'Vui lòng đăng nhập lại để tiếp tục');
-        }
         
         $nguoiDung = NguoiDung::find($nguoiDungId);
-        if (!$nguoiDung) {
-            return redirect()->route('login')->with('error', 'Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại');
-        }
         
-        // Kiểm tra mật khẩu hiện tại
+        // Kiểm tra mật khẩu hiện tại ko giống vs mật khẩu trong người dùng
         if (!Hash::check($request->current_password, $nguoiDung->mat_khau)) {
             return back()->withErrors(['current_password' => 'Mật khẩu hiện tại không chính xác']);
         }
-        
         // Cập nhật mật khẩu mới
         $nguoiDung->mat_khau = Hash::make($request->password);
         $nguoiDung->save();
