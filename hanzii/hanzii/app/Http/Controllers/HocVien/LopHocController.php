@@ -114,7 +114,7 @@ class LopHocController extends Controller
             ->orderBy('so_thu_tu')
             ->get();
             
-        // Lấy tiến độ học tập của học viên để làm nút xanh lá hoàn thành. 
+        // Lấy tiến độ học tập của học viên
         $tienDoBaiHocs = TienDoBaiHoc::where('hoc_vien_id', $hocVien->id)
             ->whereIn('bai_hoc_id', $baiHocs->pluck('bai_hoc_id')->toArray())
             ->get()
@@ -294,6 +294,54 @@ class LopHocController extends Controller
         return view('hoc-vien.lop-hoc.join-class', compact('lopHoc', 'hocVien'));
     }
     
+    /**
+     * Tham gia lớp học
+     */
+    public function thamGia(Request $request, $id)
+    {
+        $nguoiDungId = session('nguoi_dung_id');
+        if (!$nguoiDungId) {
+            return redirect()->route('login')->with('error', 'Vui lòng đăng nhập lại để tiếp tục');
+        }
+        
+        $hocVien = HocVien::where('nguoi_dung_id', $nguoiDungId)->first();
+        if (!$hocVien) {
+            return redirect()->route('login')->with('error', 'Không tìm thấy thông tin học viên. Vui lòng đăng nhập lại');
+        }
+        
+        $lopHoc = LopHoc::findOrFail($id);
+        
+        // Kiểm tra xem học viên đã tham gia lớp này chưa
+        if ($lopHoc->hocViens()->where('users.id', $hocVien->id)->exists()) {
+            return redirect()->route('hoc-vien.lop-hoc.show', $id)
+                ->with('info', 'Bạn đã tham gia lớp học này rồi');
+        }
+        
+        // Kiểm tra lớp học còn nhận học viên không (dựa trên trạng thái)
+        if ($lopHoc->trang_thai == 'da_ket_thuc') {
+            return back()->with('error', 'Lớp học này đã kết thúc, không thể tham gia');
+        }
+        
+        try {
+            DB::beginTransaction();
+            
+            // Tạo đăng ký học
+            $dangKy = new DangKyHoc();
+            $dangKy->lop_hoc_id = $id;
+            $dangKy->hoc_vien_id = $hocVien->id;
+            $dangKy->ngay_dang_ky = now();
+            $dangKy->trang_thai = 'da_xac_nhan'; // Đã xác nhận tham gia thông qua mã lớp
+            $dangKy->save();
+            
+            DB::commit();
+            
+            return redirect()->route('hoc-vien.lop-hoc.show', $id)
+                ->with('success', 'Bạn đã tham gia lớp học thành công');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Đã có lỗi xảy ra: ' . $e->getMessage());
+        }
+    }
     
     /**
      * Hiển thị danh sách lớp học có thể đăng ký
@@ -617,5 +665,49 @@ class LopHocController extends Controller
         return view('hoc-vien.lop-hoc.yeu-cau', compact('dangKyHoc', 'thongKe'));
     }
 
-  
+    /**
+     * Hiển thị danh sách học viên trong lớp học
+     */
+    public function danhSachHocVien($id)
+    {
+        $nguoiDungId = session('nguoi_dung_id');
+        if (!$nguoiDungId) {
+            return redirect()->route('login')->with('error', 'Vui lòng đăng nhập lại để tiếp tục');
+        }
+        
+        $hocVien = HocVien::where('nguoi_dung_id', $nguoiDungId)->first();
+        if (!$hocVien) {
+            return redirect()->route('login')->with('error', 'Không tìm thấy thông tin học viên. Vui lòng đăng nhập lại');
+        }
+        
+      
+        
+        // Lấy thông tin lớp học 
+        $lopHoc = LopHoc::with([
+            'khoaHoc', 
+            'giaoVien.nguoiDung',
+            'troGiang.nguoiDung'
+        ])
+        ->findOrFail($id);
+        
+        // Lấy tất cả danh sách học viên đã đăng ký và nhóm theo trạng thái
+        $dangKyHocs = DangKyHoc::with(['hocVien.nguoiDung'])
+            ->where('lop_hoc_id', $id)
+            ->get();
+            
+        // Lọc các học viên đang học thực tế
+        $danhSachHocVien = $dangKyHocs->filter(function($dangKy) {
+            return in_array($dangKy->trang_thai, ['da_xac_nhan']);
+        });
+            
+        // Đếm số lượng học viên
+        $tongSoHocVien = $danhSachHocVien->count();
+        
+        return view('hoc-vien.lop-hoc.danh-sach-hoc-vien', compact(
+            'lopHoc', 
+            'danhSachHocVien', 
+            'tongSoHocVien',
+            'hocVien'
+        ));
+    }
 } 
